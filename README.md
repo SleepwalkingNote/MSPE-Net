@@ -36,6 +36,8 @@ Every track serves in turn as the fixed target. Additional tracks enter in incre
 - `benchmark/selected_examples.csv` gives the five illustrated targets. They were selected for strictly increasing F₁ under both scopes across the five configurations.
 - `benchmark/mean_scores.csv` gives the Figure 16 target-track curves and the corresponding all-input comparison. First average over targets within each region, then average the regions equally within each terrain or across the ten regions.
 
+Run `python verify_benchmark.py` to recompute and check the counts and scores for all 510 configurations with the released checkpoint.
+
 ## Code credits
 
 The backbone, transformer, and point-set operations build on [Point-Transformers](https://github.com/qq456cvb/Point-Transformers) and [Pointnet_Pointnet2_pytorch](https://github.com/yanx27/Pointnet_Pointnet2_pytorch). Their license notices are in `third_party/`.
