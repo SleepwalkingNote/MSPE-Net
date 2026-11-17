@@ -1,6 +1,5 @@
-"""Run the released MSPE-Net checkpoint on full regions or adjacent input tracks."""
+"""Run the released MSPE-Net checkpoint on a labeled test region."""
 import argparse
-import csv
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,7 +15,6 @@ ROOT = Path(__file__).resolve().parent
 def load_model(device):
     settings = SimpleNamespace(nblocks=3, nneighbor=16, transformer_dim=128, use_fps=True)
     config = SimpleNamespace(num_point=4096, num_class=2, input_dim=3, model=settings)
-    # The original runner constructed the network on CPU before moving it to CUDA.
     model = PointTransformerSeg(config).to(device)
     weights = torch.load(ROOT / "weights/accepted_fp_reflux.pth", map_location="cpu", weights_only=True)
     model.load_state_dict(weights, strict=True)
@@ -58,29 +56,13 @@ def scores(labels, predictions):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("region", choices=sorted(p.stem for p in (ROOT / "data").glob("*.npz")))
-    parser.add_argument("--target", type=int, help="Region-local target track ID")
-    parser.add_argument("--count", type=int, choices=range(1, 6), help="Number of input tracks, including target")
     parser.add_argument("--no-reference-gate", action="store_true", help="Predict without reference-assisted height filtering")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
-    if (args.target is None) != (args.count is None):
-        parser.error("Supply --target and --count together.")
     with np.load(ROOT / "data" / (args.region + ".npz")) as archive:
         points, bounds = archive["points"], archive["bounds"]
-    tracks = None
-    if args.target is not None:
-        with (ROOT / "benchmark/track_positions.csv").open() as handle:
-            positions = {int(r["track_ID"]): float(r["cross_track_m"]) for r in csv.DictReader(handle)
-                         if r["region"] == args.region}
-        if args.target not in positions:
-            parser.error(f"Available targets in {args.region}: {sorted(positions)}")
-        tracks = sorted(positions, key=lambda t: (abs(positions[t] - positions[args.target]), t))[:args.count]
-        print("Input tracks:", *tracks)
-    predictions = predict(load_model(args.device), points, bounds, tracks, not args.no_reference_gate)
-    print("All input tracks:", scores(points[:, 3], predictions))
-    if tracks:
-        target = points[:, 4] == args.target
-        print("Fixed target:", scores(points[target, 3], predictions[target]))
+    predictions = predict(load_model(args.device), points, bounds, reference_gate=not args.no_reference_gate)
+    print(scores(points[:, 3], predictions))
 
 
 if __name__ == "__main__":
